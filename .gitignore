@@ -1,0 +1,49 @@
+# -------------------------------------
+# 1. Mac OS System Files (CRUCIAL)
+# -------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# -------------------------------------
+# 2. Environment/Secrets (CRUCIAL)
+# -------------------------------------
+# Ignore local environment variables and secrets
+.env
+.env.*
+!.env.example # <--- Add if you track a template file
+
+# -------------------------------------
+# 3. Virtual Environments & Caches
+# -------------------------------------
+.venv311/
+venv/
+__pycache__/
+*.pyc
+
+# -------------------------------------
+# 4. Logs, Outputs, and Data Files
+# -------------------------------------
+# Added your existing, plus .txt and .csv
+*.log
+*.tmp
+/dist
+/build
+*.txt
+*.csv
+*.npz
+*.json
+
+# -------------------------------------
+# 5. Media Files (Your existing rules)
+# -------------------------------------
+*.mov
+*.mp4
+
+# -------------------------------------
+# 6. Editor/IDE Files (Common)
+# -------------------------------------
+.vscode/  # VS Code settings folder
+.idea/    # JetBrains IDEs (IntelliJ, PyCharm, etc.)
+*.sublime-project
+*.sublime-workspace

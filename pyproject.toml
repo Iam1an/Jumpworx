@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jumpworx"
+version = "0.0.1"
+description = "Core geometry, pose, and trick classification utilities for Jumpworx."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Jumpworx" }]
+dependencies = [
+  # keep runtime deps minimal; sklearn is optional for heuristic fallback
+  "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+ml = [
+  "scikit-learn>=1.4",
+  "joblib>=1.3",
+]
+viz = [
+  "matplotlib>=3.7",
+  "imageio>=2.31",
+]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+]
+
+[tool.setuptools.packages.find]
+include = ["jwcore*"]
