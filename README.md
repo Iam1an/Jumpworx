@@ -35,6 +35,7 @@ It uses **Mediapipe** for keypoint extraction, **scikit-learn** models for class
 
 ## 📂 Directory Structure
 
+```
 Jumpworx/
 │
 ├── scripts/ # CLI utilities & entry points
@@ -58,8 +59,7 @@ Jumpworx/
 ├── videos/ # Raw training and pro video clips
 └── viz/ # Rendered comparison videos and metrics
 
-yaml
-Copy code
+```
 
 ---
 
@@ -80,97 +80,82 @@ cd Jumpworx
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
+```
+
 If you plan to use OpenAI for coaching:
 
-bash
-Copy code
+```
 export OPENAI_API_KEY="your_api_key_here"
+```
+
 🧪 Usage
 1. Extract Keypoints
-bash
-Copy code
+```
 python scripts/extract_keypoints.py --input videos/training/TRICK45_BACKFLIP.mov
+```
 Creates:
-
-pgsql
-Copy code
+```
 cache/TRICK45_BACKFLIP.posetrack.npz
+```
+
+... and these keypoints are used for feature generation, classification model estimation and inference, comparison, and visualization.
+
 2. Run Full Demo (with AI coaching)
-bash
-Copy code
+
+```
 python -m scripts.demo_cli videos/training/TRICK45_BACKFLIP.mov \
   --runner scripts.runner \
   --extra-args "--pro_videos_dir videos/pro --strategy closest \
   --align dtw --align_feature ankle_y \
   --llm_provider openai --llm_model gpt-4o-mini"
+```
+
 This:
 
-extracts or reuses cached poses
+- extracts or reuses cached poses
+- finds the most similar professional example
+- runs feature comparison, classification, and phase analysis
+- generates side-by-side visualization in /viz
+- optionally produces AI-written feedback
 
-finds the most similar professional example
-
-runs feature comparison, classification, and phase analysis
-
-generates side-by-side visualization in /viz
-
-optionally produces AI-written feedback
 
 🧠 Key Learning Outcomes
-Pose quality matters: Mediapipe’s keypoints are sensitive to camera angle and lighting. Multi-camera capture or better lighting drastically improves pose consistency.
 
-Granular analysis beats averages: Early versions only averaged features, hiding frame-level motion nuance. Frame-by-frame joint metrics yielded much richer coaching signals.
-
-Data completeness: Missing landmarks caused classifier noise; careful filtering and interpolation improved stability.
-
-Modularity wins: Each stage (keypoints, phases, classification, viz) is its own module, making it easy to debug or upgrade independently.
+- Pose quality matters: Mediapipe’s keypoints are sensitive to camera angle and lighting. Multi-camera capture or better lighting drastically improves pose consistency.
+- Granular analysis beats averages: Early versions only averaged features, hiding frame-level motion nuance. Frame-by-frame joint metrics yielded much richer coaching signals.
+- Data completeness: Missing landmarks caused classifier noise; careful filtering and interpolation improved stability.
+- Modularity wins: Each stage (keypoints, phases, classification, viz) is its own module, making it easy to debug or upgrade independently.
 
 🎓 Techniques & Models
-Pose estimation: Mediapipe BlazePose full-body
 
-Feature extraction: Temporal and biomechanical metrics (joint angles, airtime, body pitch)
-
-Phase detection: Takeoff, airtime, landing segmentation with airtime validation
-
-Classification: Random Forest and Logistic Regression (>95% accuracy)
-
-Similarity scoring: Dynamic Time Warping, pose vector distances
-
-Visualization: OpenCV compositing and skeletal overlays
-
-Coaching LLM: GPT-4o-mini summarizing key performance gaps
+- Pose estimation: Mediapipe BlazePose full-body
+- Feature extraction: Temporal and biomechanical metrics (joint angles, airtime, body pitch)
+- Phase detection: Takeoff, airtime, landing segmentation with airtime validation
+- Classification: Random Forest and Logistic Regression (>95% accuracy)
+- Similarity scoring: Dynamic Time Warping, pose vector distances
+- Visualization: OpenCV compositing and skeletal overlays
+- Coaching LLM: GPT-4o-mini summarizing key performance gaps
 
 📈 Example Outputs
-Visualization:
-A synchronized, labeled comparison video showing the amateur and professional performing the same trick side-by-side, with overlayed metrics and phase markers.
-
-Metrics:
+- Visualization: A synchronized, labeled comparison video showing the amateur and professional performing the same trick side-by-side, with overlayed metrics and phase markers.
+- Metrics:
 CSV and JSON summaries in /viz including:
+    - Airtime difference
+    - Takeoff/landing timing deltas
+    - Overall trick similarity score
+    - Coaching Output (example):
 
-Airtime difference
+        “Your takeoff is smooth, but your mid-air rotation speed is slightly lower than the reference. Focus on earlier hip extension to match pro airtime.”
 
-Takeoff/landing timing deltas
+🧹 Possible Next Steps:
 
-Overall trick similarity score
-
-Coaching Output (example):
-
-“Your takeoff is smooth, but your mid-air rotation speed is slightly lower than the reference. Focus on earlier hip extension to match pro airtime.”
-
-🧹 Next Steps
-Integrate multi-camera calibration for more reliable 3D landmarks.
-
-Expand classifier to detect off-axis spins and grabs.
-
-Improve automatic phase labeling and LLM contextual reasoning.
-
-Extend visualization to 3D replay using Blender or Three.js.
+- Integrate multi-camera calibration for more reliable 3D landmarks.
+- Expand classifier to detect off-axis spins and grabs.
+- Improve automatic phase labeling and LLM contextual reasoning.
+- Extend visualization to 3D replay using Blender or Three.js.
 
 🪪 License
-This project is open-source under the MIT License.
-You are free to use, modify, and distribute it with attribution.
-
-yaml
-Copy code
+This project is open-source under the MIT License. You are free to use, modify, and distribute it with attribution.
 
 ---
 
