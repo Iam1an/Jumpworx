@@ -20,15 +20,12 @@ if ROOT_DIR not in sys.path:
 
 from jwcore.posetrack_io import load_posetrack_npz
 from jwcore.compare_metrics import compare_metrics_from_xyz
+from jwcore.phase_segmentation import (
+    segment_phases_with_airtime_v2,
+    fine_labels_from_phases,
+    Phases,
+)
 
-# ================= Optional segmenter =================
-SEGMENTER_AVAILABLE = False
-try:
-    from jwcore.phase_segmentation import segment_phases_with_airtime_v2, Phases
-    SEGMENTER_AVAILABLE = True
-except Exception:
-    segment_phases_with_airtime_v2 = None
-    Phases = None
 
 # ================= MediaPipe-style indices =================
 NOSE = 0
@@ -861,11 +858,30 @@ def main():
     labelsB = load_phase_json(args.phase_json_b)
 
     segA = segB = None
-    if args.use_segmenter and SEGMENTER_AVAILABLE and (labelsA is None or labelsB is None):
+
+    # If requested, derive phase labels from the unified phase_segmentation engine
+    # for any side that does not already have explicit phase JSON.
+    if args.use_segmenter and (labelsA is None or labelsB is None):
         if labelsA is None:
-            segA = segment_phases_with_airtime_v2(arrA, fpsA_npz or 30.0)
+            phases_a, _ = segment_phases_with_airtime_v2(
+                arrA,
+                fpsA_npz or 30.0,
+                return_debug=False,
+            )
+            if phases_a.airtime is not None:
+                segA = phases_a
+                labelsA = fine_labels_from_phases(phases_a, arrA.shape[0])
+
         if labelsB is None:
-            segB = segment_phases_with_airtime_v2(arrB, fpsB_npz or 30.0)
+            phases_b, _ = segment_phases_with_airtime_v2(
+                arrB,
+                fpsB_npz or 30.0,
+                return_debug=False,
+            )
+            if phases_b.airtime is not None:
+                segB = phases_b
+                labelsB = fine_labels_from_phases(phases_b, arrB.shape[0])
+
 
     # Video / canvas setup
     if not args.blank_canvas:
@@ -920,39 +936,77 @@ def main():
         T = max(lenA, lenB)
         idxsA = np.clip(np.arange(T), 0, lenA - 1) + winA[0]
         idxsB = np.clip(np.arange(T), 0, lenB - 1) + winB[0]
+
+
     elif args.align in ("takeoff", "landing"):
         def event_from_phase(labels, event_name):
-            if labels is None:
+            """If labels were loaded from JSON and contain an explicit event, use it."""
+            if not labels:
                 return None
             try:
                 return int(labels.index(event_name))
             except ValueError:
                 return None
 
+        # 1) Try explicit labels (from JSON or derived)
         evA = event_from_phase(labelsA, args.align)
         evB = event_from_phase(labelsB, args.align)
 
-        if evA is None and args.use_segmenter and SEGMENTER_AVAILABLE:
-            segA = segA or segment_phases_with_airtime_v2(arrA, fpsA)
-            evA = segA.takeoff_idx if args.align == "takeoff" else segA.landing_idx
-        if evB is None and args.use_segmenter and SEGMENTER_AVAILABLE:
-            segB = segB or segment_phases_with_airtime_v2(arrB, fpsB)
-            evB = segB.takeoff_idx if args.align == "takeoff" else segB.landing_idx
+        # 2) Fallback: use unified phase_segmentation engine if requested
+        if evA is None and args.use_segmenter:
+            if segA is not None:
+                # segA came from earlier segment_phases_with_airtime_v2 call
+                evA = segA.takeoff_idx if args.align == "takeoff" else segA.landing_idx
+            else:
+                phases_a, _ = segment_phases_with_airtime_v2(
+                    arrA,
+                    fpsA,
+                    return_debug=False,
+                )
+                if phases_a.airtime is not None:
+                    segA = phases_a
+                    evA = segA.takeoff_idx if args.align == "takeoff" else segA.landing_idx
 
+        if evB is None and args.use_segmenter:
+            if segB is not None:
+                evB = segB.takeoff_idx if args.align == "takeoff" else segB.landing_idx
+            else:
+                phases_b, _ = segment_phases_with_airtime_v2(
+                    arrB,
+                    fpsB,
+                    return_debug=False,
+                )
+                if phases_b.airtime is not None:
+                    segB = phases_b
+                    evB = segB.takeoff_idx if args.align == "takeoff" else segB.landing_idx
+
+        # 3) Final fallback: use apex alignment if phase detection failed
         if evA is None:
             evA = apex_index(arrA)
         if evB is None:
             evB = apex_index(arrB)
 
-        winA = window_by_center(evA, fpsA, arrA.shape[0],
-                                args.seconds_before, args.seconds_after)
-        winB = window_by_center(evB, fpsB, arrB.shape[0],
-                                args.seconds_before, args.seconds_after)
+        # 4) Build windows and aligned index arrays
+        winA = window_by_center(
+            evA,
+            fpsA,
+            arrA.shape[0],
+            args.seconds_before,
+            args.seconds_after,
+        )
+        winB = window_by_center(
+            evB,
+            fpsB,
+            arrB.shape[0],
+            args.seconds_before,
+            args.seconds_after,
+        )
         lenA = winA[1] - winA[0] + 1
         lenB = winB[1] - winB[0] + 1
         T = max(lenA, lenB)
         idxsA = np.clip(np.arange(T), 0, lenA - 1) + winA[0]
         idxsB = np.clip(np.arange(T), 0, lenB - 1) + winB[0]
+
     else:  # dtw
         mapA2B = build_index_map_dtw(arrA, arrB, feature=args.align_feature)
         apexA = apex_index(arrA)
@@ -982,14 +1036,30 @@ def main():
     dbg("[DEBUG] Output fps:", fps_out)
 
     # Clip-level metrics (for HUD / airtime)
-    if args.use_segmenter and SEGMENTER_AVAILABLE:
+    # If requested, ensure we have Phases objects from the unified segmenter
+    # (segA/segB may already be set earlier from phase label logic).
+    if args.use_segmenter:
         if segA is None:
-            segA = segment_phases_with_airtime_v2(arrA, fpsA)
+            phases_a, _ = segment_phases_with_airtime_v2(
+                arrA,
+                fpsA,
+                return_debug=False,
+            )
+            if phases_a.airtime is not None:
+                segA = phases_a
+
         if segB is None:
-            segB = segment_phases_with_airtime_v2(arrB, fpsB)
+            phases_b, _ = segment_phases_with_airtime_v2(
+                arrB,
+                fpsB,
+                return_debug=False,
+            )
+            if phases_b.airtime is not None:
+                segB = phases_b
 
     mA = metrics_for_clip(arrA, fpsA, labelsA, segA)
     mB = metrics_for_clip(arrB, fpsB, labelsB, segB)
+
 
     # Window & normalize for scoring
     Awin = arrA[idxsA]

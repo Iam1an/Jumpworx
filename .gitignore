@@ -11,7 +11,7 @@
 # Ignore local environment variables and secrets
 .env
 .env.*
-!.env.example # <--- Add if you track a template file
+
 
 # -------------------------------------
 # 3. Virtual Environments & Caches
@@ -24,7 +24,6 @@ __pycache__/
 # -------------------------------------
 # 4. Logs, Outputs, and Data Files
 # -------------------------------------
-# Added your existing, plus .txt and .csv
 *.log
 *.tmp
 /dist
@@ -41,9 +40,11 @@ __pycache__/
 *.mp4
 
 # -------------------------------------
-# 6. Editor/IDE Files (Common)
+# 6. Editor/IDE Files
 # -------------------------------------
 .vscode/  # VS Code settings folder
 .idea/    # JetBrains IDEs (IntelliJ, PyCharm, etc.)
 *.sublime-project
 *.sublime-workspace
+
+
