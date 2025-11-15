@@ -1077,6 +1077,14 @@ def main():
     kneeRA = knee_flex_deg_series(An, "R")
     kneeRB = knee_flex_deg_series(Bn, "R")
 
+    # Per-frame ankle heights (windowed, original coords)
+    y_ank_A = series_ankle_y(Awin)
+    y_ank_B = series_ankle_y(Bwin)
+
+    # Per-frame min knee angle per side
+    min_kneeA = np.minimum(kneeLA, kneeRA)
+    min_kneeB = np.minimum(kneeLB, kneeRB)
+
     d_pitch = np.abs(pitchA - pitchB)
     d_knee = 0.5 * (np.abs(kneeLA - kneeLB) + np.abs(kneeRA - kneeRB))
 
@@ -1085,6 +1093,7 @@ def main():
         headB = head_pitch_deg_series(Bn)
         d_head = np.abs(headA - headB)
     else:
+        headA = headB = None
         d_head = None
 
     # per-frame similarity
@@ -1160,17 +1169,7 @@ def main():
     )
     overall_score = 100.0 * max(0.0, min(1.0, S))
 
-    # Top shared metric rows
-    r1 = f"Midair hand span: {fmt_val(scalars.get('midair_hand_span_pct_of_torso'), '.0f')}% torso"
-    r2 = (
-        f"Landing stance: {fmt_val(scalars.get('landing_stance_width_pct_of_hip'), '.0f')}% hip | "
-        f"Ankle dev max: {fmt_val(scalars.get('ankle_dev_pct_of_torso_max'), '.0f')}% torso"
-    )
-    r3 = (
-        f"Hand dev max: {fmt_val(scalars.get('hand_dev_pct_of_torso_max'), '.0f')}% torso | "
-        f"Leg axis diff@apex: {fmt_val(scalars.get('leg_axis_diff_deg_apex'), '.1f')} deg"
-    )
-
+    # (NOTE) We keep scalars for JSON/CSV but no longer use shared r1/r2/r3 at top.
     # Fit mode for skeleton drawing
     per_frame_fit = args.fit == "frame"
     fitA = fitB = None
@@ -1260,36 +1259,94 @@ def main():
                 frameB,
                 mB,
                 corner=args.hud_corner,
-                color=colB,
+                color=(0, 255, 0),
                 bottom_offset=0,
             )
 
-        # Per-frame + Overall score: Amateur only
+        # --------- Top per-frame metrics ---------
+        # Frame-level similarity (shared, but only displayed on Amateur pane)
         frame_score = float(score_disp[k]) if np.isfinite(score_disp[k]) else float("nan")
-        row4_am = (
+
+        # Amateur per-frame metrics
+        pitch_a_k = pitchA[k] if k < len(pitchA) else float("nan")
+        min_knee_a_k = min_kneeA[k] if k < len(min_kneeA) else float("nan")
+        height_a_k = y_ank_A[k] if k < len(y_ank_A) else float("nan")
+        head_a_k = headA[k] if (headA is not None and k < len(headA)) else None
+
+        # Pro per-frame metrics
+        pitch_b_k = pitchB[k] if k < len(pitchB) else float("nan")
+        min_knee_b_k = min_kneeB[k] if k < len(min_kneeB) else float("nan")
+        height_b_k = y_ank_B[k] if k < len(y_ank_B) else float("nan")
+        head_b_k = headB[k] if (headB is not None and k < len(headB)) else None
+
+        # Original frame indices and times
+        frame_idx_a = int(iA)
+        frame_idx_b = int(iB)
+        time_a = (frame_idx_a / float(fpsA)) if fpsA else None
+        time_b = (frame_idx_b / float(fpsB)) if fpsB else None
+
+        # Build row strings for Amateur (independent per-frame metrics)
+        r1A = (
+            f"Torso pitch: {fmt_val(pitch_a_k, '.1f')} deg | "
+            f"Knee angle: {fmt_val(min_knee_a_k, '.1f')} deg"
+        )
+        if head_a_k is not None:
+            r2A = (
+                f"Ankle height: {fmt_val(height_a_k, '.1f')} px | "
+                f"Head pitch: {fmt_val(head_a_k, '.1f')} deg"
+            )
+        else:
+            r2A = f"Ankle height: {fmt_val(height_a_k, '.1f')} px"
+
+        r3A = (
+            f"Frame: {frame_idx_a} | "
+            f"Time: {fmt_val(time_a, '.2f')} s"
+        )
+
+        # Scores (only Amateur pane)
+        r4A = (
             f"Frame score: {fmt_val(frame_score, '.1f')}/100 | "
             f"Overall score: {fmt_val(overall_score, '.1f')}/100"
         )
 
+        # Build row strings for Pro (independent per-frame metrics; no scores)
+        r1B = (
+            f"Torso pitch: {fmt_val(pitch_b_k, '.1f')} deg | "
+            f"Knee angle: {fmt_val(min_knee_b_k, '.1f')} deg"
+        )
+        if head_b_k is not None:
+            r2B = (
+                f"Ankle height: {fmt_val(height_b_k, '.1f')} px | "
+                f"Head pitch: {fmt_val(head_b_k, '.1f')} deg"
+            )
+        else:
+            r2B = f"Ankle height: {fmt_val(height_b_k, '.1f')} px"
+
+        r3B = (
+            f"Frame: {frame_idx_b} | "
+            f"Time: {fmt_val(time_b, '.2f')} s"
+        )
+
+        # Top overlay: Amateur (with scores) and Pro (no scores)
         put_top_block_with_title_4rows(
             frameA,
             args.label_a,
-            r1,
-            r2,
-            r3,
-            row4_am,
+            r1A,
+            r2A,
+            r3A,
+            r4A,
             top_bg_height=args.top_bg_height,
             color=colA,
         )
         put_top_block_with_title_4rows(
             frameB,
             args.label_b,
-            r1,
-            r2,
-            r3,
-            None,
+            r1B,
+            r2B,
+            r3B,
+            None,  # no score line for Pro
             top_bg_height=args.top_bg_height,
-            color=colB,
+            color=(0, 255, 0),
         )
 
         # Stack and write
