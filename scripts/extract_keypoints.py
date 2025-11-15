@@ -125,8 +125,15 @@ def extract_video(
         print("MediaPipe not available. pip install mediapipe", file=sys.stderr)
         return 2
 
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"{_stem(video_path)}.posetrack.npz")
+    # Allow out_dir to be either a directory *or* a full .npz path.
+    if out_dir.endswith(".npz"):
+        out_path = out_dir
+        out_dir_real = os.path.dirname(out_path) or "."
+    else:
+        out_dir_real = out_dir
+        out_path = os.path.join(out_dir_real, f"{_stem(video_path)}.posetrack.npz")
+
+    os.makedirs(out_dir_real, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():

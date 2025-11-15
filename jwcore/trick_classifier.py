@@ -34,6 +34,7 @@ import glob
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import joblib
@@ -44,6 +45,17 @@ from jwcore.pose_utils import (
     features_from_posetrack,
     FEATURE_KEYS,
 )
+
+# =========================
+# Defaults
+# =========================
+
+# Repo root = .../Jumpworx (one level above jwcore/)
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# Base path used when no explicit model path is given.
+# TrickClassifier() with no args will try to resolve this.
+DEFAULT_MODEL_BASE = _REPO_ROOT / "models" / "jumpworx_model"
 
 
 # =========================
@@ -73,13 +85,20 @@ class TrickClassifier:
       - class_names  : ordered list of class labels (if available)
 
     API:
-      clf = TrickClassifier("models/jumpworx_model")
+      clf = TrickClassifier()  # uses default models/jumpworx_model.joblib
+      clf = TrickClassifier("models/jumpworx_model")  # or any base/path
       label = clf.predict(features_dict)
       label, proba = clf.predict_with_proba(features_dict)
     """
 
-    def __init__(self, model_path_or_base: str):
-        self.model_path = self._resolve_model_path(model_path_or_base)
+    def __init__(self, model_path_or_base: Optional[str] = None):
+        # If no model path is given, fall back to the default bundle under models/
+        if model_path_or_base is None:
+            base = str(DEFAULT_MODEL_BASE)
+        else:
+            base = model_path_or_base
+
+        self.model_path = self._resolve_model_path(base)
         bundle = joblib.load(self.model_path)
 
         # Accept both bare pipeline and dict bundle
@@ -118,6 +137,9 @@ class TrickClassifier:
           - base + .joblib
           - directory containing a .pkl/.joblib (pick first sorted)
         """
+        # Allow Path-like bases
+        base = os.fspath(base)
+
         candidates = [base, base + ".pkl", base + ".joblib"]
 
         for c in candidates:
