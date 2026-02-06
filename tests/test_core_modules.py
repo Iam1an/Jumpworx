@@ -1,10 +1,12 @@
 # test_core_modules.py
 import os
+import pytest
 import numpy as np
-from jwcore.io_cache import load_pose
 from jwcore.normalize import normalize_prerot, height_series_up
 
+@pytest.mark.skip(reason="Requires cv2/mediapipe and a video file (integration test)")
 def test_io_cache(video_path):
+    from jwcore.io_cache import load_pose
     print(f"▶ Testing io_cache on {video_path}")
     kps, fps, w, h = load_pose(video_path, cache_dir="./cache", model_complexity=0)
     print(f"Frames: {len(kps)}, FPS: {fps}, Size: {w}x{h}")
@@ -23,6 +25,7 @@ def test_normalize(kps):
 if __name__ == "__main__":
     video = "./videos/Amateur.mp4"  # change this if needed
     assert os.path.exists(video), f"Video not found: {video}"
-    kps, fps, w, h = test_io_cache(video)
+    from jwcore.io_cache import load_pose
+    kps, fps, w, h = load_pose(video, cache_dir="./cache", model_complexity=0)
     kps_norm, heights = test_normalize(kps)
     print("\n✅ All core tests passed successfully.")
