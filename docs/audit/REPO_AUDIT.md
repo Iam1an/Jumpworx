@@ -235,39 +235,52 @@ See section at bottom of this document.
 
 ---
 
-## 11. Refactor Plan (Planning Only)
+## 11. Refactor Plan
 
-### PR 1: Fix import chain (HARNESS PREREQUISITE)
-- **Scope:** `jwcore/__init__.py` — make `io_cache` import lazy
-- **Validation:** `python -m pytest tests/ -v` — all non-io_cache, non-feedback tests should pass
-- **Risk:** Minimal; only changes import timing, not behavior
+### PR 1: Fix import chain — DONE ✓
+- **Commit:** `963ba17` — `jwcore/__init__.py` lazy import for `io_cache`
+- **Status:** Merged to main. Safety harness (37 tests) validates the fix.
 
-### PR 2: Expand safety harness tests
-- **Scope:** New test file `tests/test_compare_metrics.py` + `tests/test_coach.py` + `tests/test_coaching_thresholds.py`
-- **Validation:** Full `pytest` run, coverage increase
-- **Risk:** None; additive only
-
-### PR 3: Fix or remove broken test
-- **Scope:** `tests/test_feedback_generator.py` — either fix import path or mark as skip/remove
-- **Validation:** `pytest` clean run
-- **Risk:** Minimal
-
-### PR 4: Declare optional dependencies properly
-- **Scope:** `pyproject.toml` — add `[project.optional-dependencies].video` with `opencv-python`, `mediapipe`
-- **Validation:** Fresh venv install test
-- **Risk:** Low; does not change runtime behavior
+### PR 3: Triage legacy tests
+- **Scope:** Add `pytest.skip` (broken imports) or `@pytest.mark.xfail` (API mismatches) to the 6 pre-existing test files so `pytest -q` produces a meaningful report instead of a wall of import errors.
+- **Files touched:** `tests/test_feedback_generator.py`, `tests/test_core_modules.py`, `tests/test_phase.py`, `tests/test_pose_extract.py`, `tests/test_pose_utils.py`, `tests/test_trick_classifier.py`
+- **Acceptance criteria:**
+  - `python -m pytest tests/test_safety_harness.py -v` → 37 passed (unchanged)
+  - `python -m pytest tests/ -q` → 0 errors at collection time; legacy tests show as skipped/xfail
+- **Rollback:** `git revert <commit>` — no production code touched.
 
 ### PR 5: Add CI pipeline
-- **Scope:** `.github/workflows/test.yml` — run pytest on push/PR
-- **Validation:** GitHub Actions green
-- **Risk:** None; additive only
+- **Scope:** `.github/workflows/test.yml` — run safety harness on push to main and on PRs.
+- **Matrix:** Python 3.10, 3.11, 3.12 on ubuntu-latest.
+- **Acceptance criteria:**
+  - `python -m pytest tests/test_safety_harness.py -v` → 37 passed (local)
+  - `.github/workflows/test.yml` is valid YAML (`python -c "import yaml; yaml.safe_load(open('.github/workflows/test.yml'))"`)
+- **Rollback:** `git revert <commit>` — additive only, no production impact.
+
+### PR 4: Declare optional dependencies properly
+- **Scope:** `pyproject.toml` — add `[project.optional-dependencies].video` group with `opencv-python`, `mediapipe`.
+- **Acceptance criteria:**
+  - `pip install -e ".[video]"` succeeds in a fresh venv
+  - `python -m pytest tests/test_safety_harness.py -v` → 37 passed (no regressions)
+- **Rollback:** `git revert <commit>` — metadata-only change.
 
 ### PR 6: Guard io_cache imports properly
-- **Scope:** `jwcore/io_cache.py` — make `cv2` import conditional like `mediapipe`
-- **Validation:** `import jwcore.io_cache` succeeds without cv2; `load_pose()` raises clear error
-- **Risk:** Low; improves error messages
+- **Scope:** `jwcore/io_cache.py` — make `cv2` import conditional (try/except like `mediapipe`). `load_pose()` raises a clear `ImportError` if called without cv2.
+- **Acceptance criteria:**
+  - `python -c "import jwcore.io_cache"` succeeds without cv2 installed
+  - `python -m pytest tests/test_safety_harness.py -v` → 37 passed
+- **Rollback:** `git revert <commit>` — single-file change.
+
+### PR 2: Expand safety harness tests
+- **Scope:** Add tests to `tests/test_safety_harness.py` (or new files) for edge cases, coverage gaps identified by `--cov-report=term-missing`.
+- **Acceptance criteria:**
+  - `python -m pytest tests/test_safety_harness.py -v --cov=jwcore --cov-report=term-missing` → increased line coverage
+  - No new external dependencies
+- **Rollback:** `git revert <commit>` — test-only change.
 
 ### PR 7: Consolidate posetrack_io
-- **Scope:** `jwcore/posetrack_io.py` and `jwcore/pose_utils.py` both have `load_posetrack_npz` — deduplicate
-- **Validation:** Harness tests pass; grep for all callers
-- **Risk:** Medium; requires caller audit
+- **Scope:** `jwcore/posetrack_io.py` and `jwcore/pose_utils.py` both contain `load_posetrack_npz` — deduplicate by removing one copy and updating all callers.
+- **Acceptance criteria:**
+  - `grep -r load_posetrack_npz jwcore/ scripts/` shows exactly one definition
+  - `python -m pytest tests/test_safety_harness.py -v` → 37 passed
+- **Rollback:** `git revert <commit>` — but requires caller audit first, so verify callers before merging.
