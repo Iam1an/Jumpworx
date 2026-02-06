@@ -116,6 +116,38 @@ Additionally, `test_feedback_generator.py` imports `jwcore.feedback_generator` w
 
 **Total: 0/10 tests pass before harness fix.**
 
+### Post-Harness Test Status
+
+After the `jwcore/__init__.py` lazy import fix, the pre-existing tests still have additional breakage:
+
+| Test File | Post-Harness Status | Root Cause |
+|-----------|-------------------|------------|
+| `test_core_modules.py` | FAIL | Directly imports `jwcore.io_cache` (bypasses lazy wrapper) |
+| `test_feedback_generator.py` | FAIL | Imports `jwcore.feedback_generator` which doesn't exist |
+| `test_phase.py` | FAIL | Treats `segment_phases_with_airtime_v2` return as Phases, but it returns `(Phases, debug)` tuple |
+| `test_pose_extract.py` | FAIL | Calls `process_file()` with `fps_override=` and `strict=` kwargs that don't exist in the current signature |
+| `test_pose_utils.py` | FAIL | Imports `extract_trick_features`, `rotation_sign`, `features_to_vector` — none exist in `pose_utils.py` |
+| `test_trick_classifier.py` | FAIL | Uses `model_base_path=` kwarg; actual param is `model_path_or_base` |
+
+**All 6 pre-existing test files contain API mismatches against the current code.** The safety harness (`tests/test_safety_harness.py`) provides 37 new tests that correctly target the current API.
+
+### Phase Segmentation Bug (Pre-Existing)
+
+The `_hysteresis_mask()` function in `phase_segmentation.py:94-106` has a threshold logic issue:
+- It sets `low = air_y - hysteresis` which is *below* the actual air y-values
+- The state machine enters "active" when `y < high` (always true) but immediately exits when `y >= low` (also always true)
+- **Result:** synthetic data with step-function air/ground transitions never produces a valid airtime detection
+- This likely only works with real pose data where continuous y-values and smoothing create gradual transitions
+- The existing `test_phase.py` test uses the same synthetic pattern and would also fail if it could be collected
+
+### Safety Harness Summary
+
+| File | Tests | Status |
+|------|-------|--------|
+| `tests/test_safety_harness.py` | 37 | **ALL PASS** |
+
+**Command:** `python -m pytest tests/test_safety_harness.py -v`
+
 ---
 
 ## 6. Dependency Analysis
@@ -154,24 +186,25 @@ Additionally, `test_feedback_generator.py` imports `jwcore.feedback_generator` w
 
 ### Prerequisites
 ```bash
+cd /Users/davidpetersen/jumpworx-assessment
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev,ml]"
 ```
 
-### Run all tests (safety harness)
+### Run safety harness (37 tests, no external deps required)
 ```bash
-python -m pytest tests/ -v
-```
-
-### Run only the safety harness (fast, no external deps)
-```bash
-python -m pytest tests/ -v -k "not test_io_cache and not test_feedback"
+python -m pytest tests/test_safety_harness.py -v
 ```
 
 ### Run with coverage
 ```bash
-python -m pytest tests/ -v --cov=jwcore --cov-report=term-missing
+python -m pytest tests/test_safety_harness.py -v --cov=jwcore --cov-report=term-missing
+```
+
+### Run full test suite (includes pre-existing broken tests; expect failures)
+```bash
+python -m pytest tests/ -v
 ```
 
 ---
