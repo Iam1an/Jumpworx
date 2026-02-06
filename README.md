@@ -26,7 +26,7 @@ It uses **Mediapipe** for keypoint extraction, **scikit-learn** models for class
 | 🎥 **Pose Extraction** | `scripts/extract_keypoints.py` | Uses Mediapipe to extract 3D body landmarks from a video and saves them as `.npz` pose tracks in `/cache`. |
 | 🧠 **Feature Engineering** | `jwcore/pose_extract.py` | Computes biomechanical and kinematic features from the pose data (joint velocities, rotations, airtime metrics, etc.). |
 | 🧩 **Phase Segmentation** | `jwcore/phase_segmentation.py` | Detects takeoff, airtime, and landing phases of a jump. |
-| 🏷️ **Trick Classification** | `jwcore/trick_classifier.py`, `scripts/train_trick_model.py` | Uses Random Forest and Logistic Regression models to predict trick type from feature vectors. |
+| 🏷️ **Trick Classification** | `jwcore/trick_classifier.py`, `scripts/train_zonly.py` | Uses Logistic Regression to predict trick type from feature vectors. See [docs/ml/PIPELINE.md](docs/ml/PIPELINE.md). |
 | 🎮 **Comparison & Visualization** | `scripts/viz_compare_side_by_side.py` | Renders synchronized side-by-side playback of an amateur vs. pro trick, aligned by takeoff, landing, or apex. |
 | 🧑‍🏫 **Coaching (Optional)** | `jwcore/coach.py`, `scripts/demo_cli.py` | Generates feedback text comparing motion quality and timing. Integrates OpenAI GPT-4o-mini for natural-language advice. |
 
