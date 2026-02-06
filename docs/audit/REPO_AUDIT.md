@@ -155,18 +155,18 @@ The `_hysteresis_mask()` function in `phase_segmentation.py:94-106` has a thresh
 ### Declared (`pyproject.toml`):
 - **Core:** numpy >= 1.24
 - **Optional [ml]:** scikit-learn >= 1.4, joblib >= 1.3
+- **Optional [video]:** opencv-python, mediapipe
 - **Optional [viz]:** matplotlib >= 3.7, imageio >= 2.31
 - **Optional [dev]:** pytest >= 7.4, pytest-cov >= 4.1
 
-### Undeclared but used at import time:
-- `cv2` (OpenCV) — **hard import** in `jwcore/io_cache.py`, propagated via `jwcore/__init__.py`
-- `mediapipe` — guarded import in `io_cache.py` (deferred, OK)
+### Previously undeclared (now declared):
+- `cv2` (OpenCV) and `mediapipe` — declared in `[video]` extra; guarded import in `jwcore/io_cache.py`
 
 ### Undeclared but used at runtime (optional):
 - `openai` — for LLM coaching in `scripts/generate_coaching.py`
 
 ### CI/CD:
-- **None.** No `.github/workflows/`, no `Makefile`, no `tox.ini`, no `pytest.ini`.
+- `.github/workflows/test.yml` — runs safety harness on push/PR (Python 3.10–3.12).
 
 ---
 
@@ -194,8 +194,15 @@ pip install -e ".[dev,ml]"
 
 - **`dev`** — installs pytest and pytest-cov (test runner tooling).
 - **`ml`** — installs scikit-learn and joblib. Required by the safety harness because `TrickClassifier` tests load a joblib model from `models/`.
+- **`video`** — installs opencv-python and mediapipe. Only needed if using `load_pose()` for video keypoint extraction.
 
 No network access, databases, or external services are needed.
+
+To install everything (including video extraction):
+
+```bash
+pip install -e ".[dev,ml,video]"
+```
 
 ### Recommended: run the safety harness (37 tests)
 
