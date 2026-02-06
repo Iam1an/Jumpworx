@@ -3,6 +3,11 @@
 # Safety harness: locks down core module behaviors with deterministic,
 # synthetic-data tests. No external dependencies (no cv2, mediapipe, LLM).
 #
+# Companion modules (split from this file):
+#   tests/test_coaching_thresholds.py  — TAU/UNITS, material_delta, select_top_metrics
+#   tests/test_coach.py               — rule-based coaching path
+#   tests/test_compare_metrics.py     — DTW alignment, scalar metrics
+#
 # Run: python -m pytest tests/test_safety_harness.py -v
 
 import json
@@ -212,138 +217,7 @@ def test_sign_convention_positive():
 
 
 # ===================================================================
-# 5. Coaching thresholds (jwcore/coaching_thresholds.py)
-# ===================================================================
-
-def test_tau_keys_match_units_and_phase_tag():
-    from jwcore.coaching_thresholds import TAU, UNITS, PHASE_TAG
-    for key in TAU:
-        assert key in UNITS, f"TAU key '{key}' missing from UNITS"
-        assert key in PHASE_TAG, f"TAU key '{key}' missing from PHASE_TAG"
-
-
-def test_material_delta_above_threshold():
-    from jwcore.coaching_thresholds import material_delta
-    assert material_delta("pitch_total_rad", 0.5) is True
-    assert material_delta("pitch_total_rad", 0.1) is False
-
-
-def test_select_top_metrics_filters_below_tau():
-    from jwcore.coaching_thresholds import select_top_metrics
-    am = {"pitch_total_rad": 0.1}  # below TAU of 0.35
-    result = select_top_metrics(am, None, ["pitch_total_rad"])
-    assert len(result) == 0
-
-
-def test_select_top_metrics_includes_above_tau():
-    from jwcore.coaching_thresholds import select_top_metrics
-    am = {"pitch_total_rad": 1.0}
-    pro = {"pitch_total_rad": 0.2}
-    result = select_top_metrics(am, pro, ["pitch_total_rad"])
-    assert len(result) == 1
-    assert result[0]["key"] == "pitch_total_rad"
-    assert abs(result[0]["delta"] - 0.8) < 1e-6
-
-
-def test_select_top_metrics_respects_max_items():
-    from jwcore.coaching_thresholds import select_top_metrics, TAU
-    am = {}
-    pro = {}
-    keys = []
-    for i, key in enumerate(TAU):
-        am[key] = TAU[key] * 3  # well above threshold
-        pro[key] = 0.0
-        keys.append(key)
-    result = select_top_metrics(am, pro, keys, max_items=2)
-    assert len(result) <= 2
-
-
-# ===================================================================
-# 6. Coach (jwcore/coach.py) — rule-based path only
-# ===================================================================
-
-def test_coach_rule_based_returns_structure():
-    from jwcore.coach import coach
-    features = {
-        "airtime_s": 0.8,
-        "pitch_total_rad": 3.14,
-        "ankle_dev_pct_of_torso_max": 25.0,
-        "hand_dev_pct_of_torso_max": 22.0,
-    }
-    pro_features = {
-        "ankle_dev_pct_of_torso_max": 5.0,
-        "hand_dev_pct_of_torso_max": 4.0,
-    }
-    result = coach(features, predicted_label="backflip", pro_features=pro_features)
-    assert "tips" in result
-    assert "source" in result
-    assert "label" in result
-    assert result["source"] == "rule"
-    assert isinstance(result["tips"], list)
-
-
-def test_coach_empty_features():
-    from jwcore.coach import coach
-    result = coach({}, predicted_label="backflip")
-    assert "tips" in result
-    assert len(result["tips"]) > 0
-
-
-def test_coach_non_dict_features():
-    from jwcore.coach import coach
-    result = coach(None)
-    assert result["source"] == "none"
-    assert result["tips"] == []
-
-
-# ===================================================================
-# 7. Compare metrics (jwcore/compare_metrics.py)
-# ===================================================================
-
-def test_compare_metrics_identical_poses():
-    from jwcore.compare_metrics import compare_metrics_from_xyz
-    T, J = 30, 33
-    rng = np.random.RandomState(99)
-    pose = rng.randn(T, J, 3).astype(np.float32)
-    result = compare_metrics_from_xyz(pose.copy(), pose.copy())
-    assert "scalars" in result
-    assert "joints" in result
-    assert "alignment" in result
-    assert "phase_scores" in result
-    # Identical poses: pitch delta should be ~0
-    pitch_delta = result["scalars"]["pitch_total_rad"]
-    assert abs(pitch_delta) < 0.01, f"pitch_total_rad for identical poses: {pitch_delta}"
-
-
-def test_compare_metrics_returns_all_scalar_keys():
-    from jwcore.compare_metrics import compare_metrics_from_xyz
-    T, J = 20, 33
-    am = np.random.RandomState(1).randn(T, J, 3).astype(np.float32)
-    pro = np.random.RandomState(2).randn(T, J, 3).astype(np.float32)
-    result = compare_metrics_from_xyz(am, pro)
-    expected_keys = [
-        "midair_hand_span_pct_of_torso",
-        "midair_hand_asym_pct_of_torso",
-        "landing_stance_width_pct_of_hip",
-        "pitch_total_rad",
-        "ankle_dev_pct_of_torso_max",
-        "hand_dev_pct_of_torso_max",
-        "leg_axis_diff_deg_apex",
-        "head_early_pitch_lead_deg",
-    ]
-    for key in expected_keys:
-        assert key in result["scalars"], f"Missing scalar key: {key}"
-
-
-def test_compare_metrics_shape_validation():
-    from jwcore.compare_metrics import compare_metrics_from_xyz
-    bad = np.zeros((10, 33), dtype=np.float32)  # 2D, not 3D
-    with pytest.raises(ValueError, match="must be.*3.*arrays"):
-        compare_metrics_from_xyz(bad, bad)
-
-
-# ===================================================================
-# 8. Posetrack I/O (jwcore/posetrack_io.py)
+# 5. Posetrack I/O (jwcore/posetrack_io.py)
 # ===================================================================
 
 def test_load_posetrack_canonical_layout(tmp_path):
@@ -388,7 +262,7 @@ def test_load_posetrack_bad_layout(tmp_path):
 
 
 # ===================================================================
-# 9. Pose extract / process_file (jwcore/pose_extract.py)
+# 6. Pose extract / process_file (jwcore/pose_extract.py)
 # ===================================================================
 
 def test_process_file_creates_json(tmp_path):
@@ -409,7 +283,7 @@ def test_process_file_creates_json(tmp_path):
 
 
 # ===================================================================
-# 10. Joints constants (jwcore/joints.py)
+# 7. Joints constants (jwcore/joints.py)
 # ===================================================================
 
 def test_joints_constants():
@@ -430,7 +304,7 @@ def test_joints_constants():
 
 
 # ===================================================================
-# 11. Trick classifier (jwcore/trick_classifier.py)
+# 8. Trick classifier (jwcore/trick_classifier.py)
 # ===================================================================
 
 def test_trick_classifier_feature_names():
@@ -470,7 +344,7 @@ def test_trick_classifier_predict_with_proba():
 
 
 # ===================================================================
-# 12. Feature deltas (jwcore/feature_deltas.py)
+# 9. Feature deltas (jwcore/feature_deltas.py)
 # ===================================================================
 
 def test_feature_deltas():
