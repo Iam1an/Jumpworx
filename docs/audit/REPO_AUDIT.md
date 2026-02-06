@@ -184,28 +184,40 @@ The `_hysteresis_mask()` function in `phase_segmentation.py:94-106` has a thresh
 
 ## 8. Quickstart
 
-### Prerequisites
+### Prerequisites (from repo root)
+
 ```bash
-cd /Users/davidpetersen/jumpworx-assessment
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # .venv\Scripts\activate on Windows
 pip install -e ".[dev,ml]"
 ```
 
-### Run safety harness (37 tests, no external deps required)
+- **`dev`** — installs pytest and pytest-cov (test runner tooling).
+- **`ml`** — installs scikit-learn and joblib. Required by the safety harness because `TrickClassifier` tests load a joblib model from `models/`.
+
+No network access, databases, or external services are needed.
+
+### Recommended: run the safety harness (37 tests)
+
 ```bash
 python -m pytest tests/test_safety_harness.py -v
 ```
 
 ### Run with coverage
+
 ```bash
 python -m pytest tests/test_safety_harness.py -v --cov=jwcore --cov-report=term-missing
 ```
 
-### Run full test suite (includes pre-existing broken tests; expect failures)
+### Run full test suite (legacy tests currently failing; expect failures)
+
 ```bash
 python -m pytest tests/ -v
 ```
+
+> The six pre-existing test files under `tests/` have API mismatches against the
+> current production code (wrong kwargs, missing symbols, incorrect return-type
+> assumptions). Only `tests/test_safety_harness.py` targets the current API.
 
 ---
 
