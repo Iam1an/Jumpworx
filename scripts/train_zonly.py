@@ -34,8 +34,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 import joblib
 
+from jwcore.posetrack_io import load_posetrack_npz
 from jwcore.pose_utils import (
-    load_posetrack_npz,
     features_from_posetrack,
     FEATURE_KEYS,
 )
@@ -55,7 +55,7 @@ def collect_examples(paths: List[str]) -> Tuple[np.ndarray, np.ndarray, List[str
 
     for pth in paths:
         try:
-            P, V, meta = load_posetrack_npz(pth)
+            P, V, _fps, meta = load_posetrack_npz(pth)
             feats = features_from_posetrack(P, V, meta)
         except Exception as e:
             print(f"[skip] {pth}: {e}", file=sys.stderr)

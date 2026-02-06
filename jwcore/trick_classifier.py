@@ -40,8 +40,8 @@ from typing import Dict, List, Tuple, Optional
 import joblib
 import numpy as np
 
+from jwcore.posetrack_io import load_posetrack_npz
 from jwcore.pose_utils import (
-    load_posetrack_npz,
     features_from_posetrack,
     FEATURE_KEYS,
 )
@@ -281,7 +281,7 @@ def predict_one(clf, npz_path: str) -> Dict:
       - probs: full per-class dict if available, else {label: proba} or None
       - features: flat feature dict used
     """
-    P, V, meta = load_posetrack_npz(npz_path)
+    P, V, _fps, meta = load_posetrack_npz(npz_path)
     feats = features_from_posetrack(P, V, meta)
 
     # Core prediction
