@@ -26,6 +26,23 @@ def test_jwcore_import_without_cv2():
 
 
 # ===================================================================
+# 1b. io_cache guarded imports (jwcore/io_cache.py)
+# ===================================================================
+
+def test_io_cache_importable():
+    """jwcore.io_cache must import without cv2/mediapipe installed."""
+    import jwcore.io_cache  # should not raise
+
+def test_io_cache_load_pose_error_without_video_deps():
+    """load_pose() raises ImportError with helpful message when deps missing."""
+    from jwcore.io_cache import load_pose as _lp, cv2 as _cv2, mp as _mp
+    if _cv2 is not None and _mp is not None:
+        pytest.skip("cv2 and mediapipe are installed; cannot test missing-dep path")
+    with pytest.raises(ImportError, match=r"\.\[video\]"):
+        _lp("dummy.mp4")
+
+
+# ===================================================================
 # 2. Normalization (jwcore/normalize.py)
 # ===================================================================
 

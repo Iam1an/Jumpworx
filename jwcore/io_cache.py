@@ -1,12 +1,16 @@
 # jwcore/io_cache.py
 import os, hashlib
 import numpy as np
-import cv2
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 try:
     import mediapipe as mp
 except ImportError:
-    mp = None  # defer error until actually extracting
+    mp = None
 
 
 def _hash(path: str, mc: int) -> str:
@@ -25,8 +29,12 @@ def _to_int_scalar(x) -> int:
 
 
 def _extract_pose(video_path: str, model_complexity: int = 1) -> tuple[np.ndarray, float, int, int]:
-    if mp is None:
-        raise RuntimeError("mediapipe not installed. pip install mediapipe")
+    if cv2 is None or mp is None:
+        missing = [n for n, m in [("opencv-python", cv2), ("mediapipe", mp)] if m is None]
+        raise ImportError(
+            f"Video dependencies not installed: {', '.join(missing)}. "
+            'Install them with: pip install -e ".[video]"'
+        )
 
     mp_pose = mp.solutions.pose
     cap = cv2.VideoCapture(video_path)
@@ -71,7 +79,16 @@ def load_pose(video_path: str, cache_dir: str = "./cache", model_complexity: int
     """
     Returns (kps_pix:(T,33,2), fps:float, w:int, h:int).
     Extracts only once per video+model_complexity; otherwise loads from cache.
+
+    Raises ImportError if opencv-python or mediapipe are not installed.
+    Install with: pip install -e ".[video]"
     """
+    if cv2 is None or mp is None:
+        missing = [n for n, m in [("opencv-python", cv2), ("mediapipe", mp)] if m is None]
+        raise ImportError(
+            f"Video dependencies not installed: {', '.join(missing)}. "
+            'Install them with: pip install -e ".[video]"'
+        )
     os.makedirs(cache_dir, exist_ok=True)
     key = f"{_hash(video_path, model_complexity)}.npz"
     cache_path = os.path.join(cache_dir, key)
