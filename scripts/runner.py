@@ -530,94 +530,18 @@ def main():
         )
         clf = None
 
-    # 3b) Generic fallback classifier
+    # 3b) Fallback: retry TrickClassifier with alternate model path
     if clf is None and label is None:
-        import joblib
-
-        class FallbackTrickClassifier:
-            def __init__(self, model_base_path: str):
-                self.model_base = model_base_path
-                self.pipe = None
-                self.class_names = None
-                self.feature_keys = list(FEATURE_KEYS)
-                cands = [
-                    model_base_path,
-                    model_base_path + ".pkl",
-                    model_base_path + ".joblib",
-                ]
-                bundle = None
-                self._path = None
-                for c in cands:
-                    if os.path.isdir(c):
-                        hits = [
-                            os.path.join(c, p)
-                            for p in os.listdir(c)
-                            if p.endswith(".pkl") or p.endswith(".joblib")
-                        ]
-                        if hits:
-                            self._path = hits[0]
-                            bundle = joblib.load(self._path)
-                            break
-                    elif os.path.exists(c):
-                        self._path = c
-                        bundle = joblib.load(c)
-                        break
-                if bundle is None:
-                    raise FileNotFoundError(
-                        f"Model not found for base '{model_base_path}' "
-                        f"(tried {', '.join(cands)})"
-                    )
-                if isinstance(bundle, dict):
-                    self.pipe = bundle.get("model") or bundle.get("pipeline")
-                    self.feature_keys = bundle.get("feature_keys") or self.feature_keys
-                    self.class_names = bundle.get("class_names")
-                else:
-                    self.pipe = bundle
-                if self.pipe is None:
-                    raise RuntimeError(
-                        "FallbackTrickClassifier: no model pipeline in bundle"
-                    )
-
-            def _to_row(self, features: dict):
-                vals = []
-                for k in self.feature_keys:
-                    try:
-                        vals.append(float(features.get(k, 0.0)))
-                    except Exception:
-                        vals.append(0.0)
-                return np.array([vals], dtype=np.float32)
-
-            def predict(self, features: dict) -> str:
-                x = self._to_row(features)
-                y = self.pipe.predict(x)[0]
-                return str(y)
-
-            def predict_with_proba(self, features: dict):
-                if not hasattr(self.pipe, "predict_proba"):
-                    return self.predict(features), None
-                x = self._to_row(features)
-                proba_vec = self.pipe.predict_proba(x)[0]
-                y = self.pipe.predict(x)[0]
-                if (
-                    self.class_names is not None
-                    and len(proba_vec) == len(self.class_names)
-                ):
-                    try:
-                        idx = list(self.class_names).index(y)
-                        return str(y), float(proba_vec[idx])
-                    except Exception:
-                        return str(y), None
-                return str(y), None
-
         try:
-            fb = FallbackTrickClassifier(args.model_base)
+            from jwcore.trick_classifier import TrickClassifier as JWTrickClassifier2
+            fb = JWTrickClassifier2(args.model_base)
             y, p = fb.predict_with_proba(amateur_feats)
             label = str(y)
             proba = float(p) if p is not None else None
         except Exception as e:
             emit(
                 "warn",
-                msg="Generic classifier load failed; proceeding without classification",
+                msg="Fallback classifier load failed; proceeding without classification",
                 error=str(e),
             )
             label = None

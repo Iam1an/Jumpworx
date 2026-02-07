@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: This script is out of sync with the current TrickClassifier API
+and FEATURE_KEYS. Use scripts/train_zonly.py instead.
+
+Known issues (not fixed):
+  - USED_FEATURES references names that no longer exist in FEATURE_KEYS
+  - Calls TrickClassifier(model_base_path=...) — actual param is model_path_or_base
+  - Calls tc.train(), tc.set_params(), tc.predict_many() — none exist on TrickClassifier
+
+Canonical training script: scripts/train_zonly.py
+  python scripts/train_zonly.py --glob "cache/*.posetrack.npz"
+
+--- Original docstring below ---
+
 Train (or re-train) the TrickClassifier from labeled clips.
 
 Now defaults to a Z-dominant feature set that cleanly separates frontflip/backflip
@@ -209,6 +222,13 @@ def save_report(model_base: str, y_true: np.ndarray, y_pred: np.ndarray, labels_
 
 
 def main():
+    import warnings
+    warnings.warn(
+        "train_trick_model.py is DEPRECATED and will not produce a working model. "
+        "Use scripts/train_zonly.py instead. See docs/ml/PIPELINE.md for details.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     ap = argparse.ArgumentParser(description="Train (re-train) TrickClassifier with Z-dominant features.")
     ap.add_argument("--labels_csv", required=True, help="CSV with columns: clip_id,label[,video_path]")
     ap.add_argument("--features_dir", default="features", help="Where feature JSONs live (or will be written)")

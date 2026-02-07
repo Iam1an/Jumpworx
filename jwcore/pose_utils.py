@@ -67,24 +67,6 @@ FEATURE_KEYS = [
 ]
 
 # ---------------------------------------------------------------------
-# I/O
-# ---------------------------------------------------------------------
-def load_posetrack_npz(npz_path: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
-    """
-    Load canonical NPZ and return (P, V, meta_dict).
-    Raises KeyError if required keys are missing.
-    """
-    dat = np.load(npz_path, allow_pickle=False)
-    if not {"P", "V", "meta_json"} <= set(dat.files):
-        missing = {"P", "V", "meta_json"} - set(dat.files)
-        raise KeyError(f"Missing required keys in {npz_path}: {sorted(missing)}")
-    P = dat["P"].astype(np.float32)
-    V = dat["V"].astype(np.float32)
-    meta = json.loads(str(dat["meta_json"]))
-    return P, V, meta
-
-
-# ---------------------------------------------------------------------
 # Utilities
 # ---------------------------------------------------------------------
 def _nanpercentile(a: np.ndarray, q: float) -> float:
@@ -324,7 +306,8 @@ def _cli() -> None:
     ap.add_argument("--npz", required=True, help="Path to canonical NPZ (with P,V,meta_json)")
     args = ap.parse_args()
 
-    P, V, meta = load_posetrack_npz(args.npz)
+    from jwcore.posetrack_io import load_posetrack_npz
+    P, V, _fps, meta = load_posetrack_npz(args.npz)
     feats = features_from_posetrack(P, V, meta)
 
     # Pretty print a compact summary honoring FEATURE_KEYS

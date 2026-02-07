@@ -34,8 +34,8 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
+from jwcore.posetrack_io import load_posetrack_npz
 from jwcore.pose_utils import (
-    load_posetrack_npz,
     features_from_posetrack,
     FEATURE_KEYS,
 )
@@ -53,7 +53,7 @@ def _save_features_json(out_path: str, feats: Dict[str, float]) -> None:
         json.dump(out, f, indent=2)
 
 def process_file(npz_path: str, out_dir: str, verbose: bool = False) -> str:
-    P, V, meta = load_posetrack_npz(npz_path)
+    P, V, _fps, meta = load_posetrack_npz(npz_path)
     feats = features_from_posetrack(P, V, meta)
 
     # Ensure schema completeness
